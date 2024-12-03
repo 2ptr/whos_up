@@ -42,6 +42,7 @@ inputgroup.add_argument('-tf', help='Newline-delimited single target file (10.10
 # Configurable options
 parser.add_argument('-p', help='Port list to test. Default is 80,443.', default='80,443', metavar='[ports]')
 parser.add_argument('--no-random', help='Don\'t randomly select hosts from subnets.', action="store_true")
+parser.add_argument('-t', help='Timeout in seconds. Default is 3s.', default=3, type=int, metavar='[num]')
 parser.add_argument('-s', help='Sleep in seconds. Default is 5s.', default=5, type=int, metavar='[num]')
 parser.add_argument('-j', help='Jitter in seconds. Default is 2s.', default=2, type=int, metavar='[num]')
 parser.add_argument('-ua', help='User-agent for requests. Default is Windows/Mozilla.', default='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0', metavar='"Mozilla 1.x"')
@@ -100,13 +101,13 @@ def main():
             try:
                 # HTTP
                 # "Sleep" is just our timeout
-                response = requests.get(f"http://{target}", timeout=(1 if (args.s == 0) else args.s), verify=False)
+                response = requests.get(f"http://{target}", timeout={args.t}, verify=False)
                 print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} http://{Style.RESET_ALL}{target} is up!")
                 printResponse(response)
 
             except requests.exceptions.SSLError:
                 # HTTPS
-                response = requests.get(f"https://{target}", timeout=10, verify=False)
+                response = requests.get(f"https://{target}", timeout={args.t}, verify=False)
                 print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} https://{Style.RESET_ALL}{target} is up!")
                 printResponse(response)
 
@@ -115,14 +116,14 @@ def main():
                 print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} https://{target} has an SSL error.")
 
             except requests.exceptions.ReadTimeout:
-                # Timeouts after SSL
-                print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} https://{target} timed out, but is likely up.")
+                # Timeouts
+                print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} {target} timed out, but is likely up.")
 
             except:
                 pass
             
             # "Jitter" is inbetween jobs
-            sleep(random.randint(0,args.j))
+            sleep(args.s + random.randint(0,args.j))
             scanned.append(target)
         
 
