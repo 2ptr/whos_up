@@ -1,9 +1,11 @@
 # Who's Up?
 
-Enumerate alive HTTP/S hosts with a simple configurable scripts. All this script does is use requests and some time delay to calm down any potential detections.
+A script for when you want to take things slow in web host enumeration.
 
 ## Options
+- Scan ports
 - Sleep
 - Jitter
-- Random user agent
+- Custom user agents
+- Timeout
 - Random target selection (from lists or CIDR ranges)

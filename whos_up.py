@@ -54,6 +54,7 @@ args = parser.parse_args()
 settings_blob = f"""{Style.BRIGHT}{Fore.MAGENTA}[*]{Style.RESET_ALL} Scan settings:
 - Ports : {args.p}
 - Target Selection : {'Sequential' if args.no_random else 'Random'}
+- Timeout : {args.t} seconds
 - Sleep : {args.s} seconds
 - Jitter : {args.j} seconds
 - User-agent: {args.ua if args.ua else 'Random (default)'}
@@ -61,25 +62,21 @@ settings_blob = f"""{Style.BRIGHT}{Fore.MAGENTA}[*]{Style.RESET_ALL} Scan settin
 
 def printResponse(response):
     html = bs4.BeautifulSoup(response.text)
-    print(f"    [ Status : {response.status_code} ]")
     try:
         server = response.headers['Server']
     except:
         server = "???"
-    print(f"    [ Server : {server} ]")
-    print(f"    [ Title : {html.title.text if html.title else "???"} ]")
+    print(f"    [ Status : {response.status_code}")
+    print(f"    [ Server : {server}")
+    print(f"    [ Title  : {html.title.text if html.title else "???"}")
 
 
 def main():
     print(settings_blob)
     ports = args.p.split(',')
-
-    
-
-
     input()
 
-    # CIDR Subnet
+    ### CIDR Subnet Mode
     if(args.r):
         # Generate all target connection strings (ports included)
         ips = [str(ip) for ip in ipaddress.IPv4Network(args.r)]
@@ -88,36 +85,38 @@ def main():
             for port in ports:
                 targets.append(f"{ip}:{port}")
 
-        print(f"{Style.BRIGHT}{Fore.YELLOW}[~]{Style.RESET_ALL} Starting scan of subnet {args.r} - {len(targets)} targets")
-
+        print(f"{Style.BRIGHT}{Fore.YELLOW}[~]{Style.RESET_ALL} Starting scan of subnet {args.r} - {len(targets)} targets (~{len(targets)*(args.s + args.t)} seconds)")
         # Scan
         scanned = []
+        alive = []
         target = random.choice(targets)
         for i in targets:
             while target in scanned:
                 target = random.choice(targets)
             
-            
             try:
                 # HTTP
-                # "Sleep" is just our timeout
-                response = requests.get(f"http://{target}", timeout={args.t}, verify=False)
-                print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} http://{Style.RESET_ALL}{target} is up!")
+                response = requests.get(f"http://{target}", timeout=3, verify=False)
+                print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} http://{Style.RESET_ALL}{target}")
                 printResponse(response)
+                alive.append(target)
 
             except requests.exceptions.SSLError:
                 # HTTPS
-                response = requests.get(f"https://{target}", timeout={args.t}, verify=False)
-                print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} https://{Style.RESET_ALL}{target} is up!")
+                response = requests.get(f"https://{target}", timeout=3, verify=False)
+                print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} https://{Style.RESET_ALL}{target}")
                 printResponse(response)
+                alive.append(target)
 
             except requests.exceptions.SSLError:
                 # HTTPS with additional SSL error
-                print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} https://{target} has an SSL error.")
+                print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} https://{target} is up but has an SSL error.")
+                alive.append(target)
 
             except requests.exceptions.ReadTimeout:
                 # Timeouts
                 print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} {target} timed out, but is likely up.")
+                alive.append(target)
 
             except:
                 pass
@@ -125,14 +124,13 @@ def main():
             # "Jitter" is inbetween jobs
             sleep(args.s + random.randint(0,args.j))
             scanned.append(target)
-        
 
 
-    # File with CIDR Subnets
+    ### File with CIDR Subnets
     if(args.rf):
         pass
 
-    # File with raw targets
+    ### File with raw targets
     if(args.tf):
         pass
 
