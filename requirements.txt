@@ -1,0 +1,4 @@
+colorama
+lxml
+bs4
+requests
