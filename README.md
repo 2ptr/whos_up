@@ -22,11 +22,4 @@ targets:
   -rf subnets.txt    Subnet ranges file (10.10.10.0/24, 10.10.11.0/24, etc.)
   -tf hosts.txt      Newline-delimited single target file (10.10.10.10, 10.10.10.11, etc.)
   ```
-
-## Options
-- Ports to scan
-- Request timeout
-- Random target selection (from lists or CIDR ranges)
-- Sleep
-- Jitter
-- Custom user agent
+![example](./example.png)
