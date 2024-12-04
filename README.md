@@ -4,6 +4,11 @@
 
 A basic script for when you want to take things slow in web host enumeration and avoid IDS. Provide CIDR ranges or a host list and kick back.
 
+The script will report status codes, server headers, and HTML title tags if it can find them:
+![example](./example.png)
+
+All alive hosts are saved to `web-hosts.txt` by default.
+
 ## Usage
 ```
 options:
@@ -22,4 +27,3 @@ targets:
   -rf subnets.txt    Subnet ranges file (10.10.10.0/24, 10.10.11.0/24, etc.)
   -tf hosts.txt      Newline-delimited single target file (10.10.10.10, 10.10.10.11, etc.)
   ```
-![example](./example.png)
