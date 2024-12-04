@@ -49,7 +49,7 @@ parser.add_argument('-j', help='Jitter in seconds. Default is 1s.', default=1, t
 parser.add_argument('-ua', help='User-agent for requests. Default is Windows/Mozilla.', default='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0', metavar='"Mozilla 1.x"')
 
 parser.add_argument('-o', help='Output file for alive hosts. Defaults to web-hosts.txt.', type=str, default='web-hosts.txt',  metavar='alive.txt')
-parser.add_argument('--debug', help='Don\'t randomly select hosts from subnets.', action="store_true")
+parser.add_argument('--debug', help='Show all request results.', action="store_true")
 
 args = parser.parse_args()
 ports = args.p.split(',')

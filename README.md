@@ -4,10 +4,12 @@
 
 A basic script for when you want to take things slow in web host enumeration and avoid IDS. Provide CIDR ranges or a host list and kick back.
 
+## Usage
+
 ## Options
-- Scan ports
+- Ports to scan
+- Request timeout
+- Random target selection (from lists or CIDR ranges)
 - Sleep
 - Jitter
-- Custom user agents
-- Timeout
-- Random target selection (from lists or CIDR ranges)
+- Custom user agent
