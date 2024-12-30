@@ -48,8 +48,10 @@ parser.add_argument('-s', help='Sleep in seconds. Default is 3s.', default=3, ty
 parser.add_argument('-j', help='Jitter in seconds. Default is 1s.', default=1, type=int, metavar='[num]')
 parser.add_argument('-ua', help='User-agent for requests. Default is Windows/Mozilla.', default='Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0', metavar='"Mozilla 1.x"')
 
-parser.add_argument('-o', help='Output file for alive hosts. Defaults to web-hosts.txt.', type=str, default='web-hosts.txt',  metavar='alive.txt')
-parser.add_argument('--debug', help='Show all request results.', action="store_true")
+# Other options
+parser.add_argument("--ntlm", help="Search for commonly abused NTLM authentication endpoints.", action="store_true")
+parser.add_argument('-o', help='Output file for alive hosts. Defaults to web-hosts.txt.', type=str, default='web-hosts.txt',  metavar='web-hosts.txt')
+parser.add_argument('--debug', help='Show debug information.', action="store_true")
 
 args = parser.parse_args()
 ports = args.p.split(',')
@@ -68,99 +70,137 @@ settings_blob = f"""{Style.BRIGHT}{Fore.MAGENTA}[*]{Style.RESET_ALL} Scan settin
 - User-agent: {args.ua if args.ua else 'Random (default)'}
 >> Press Enter to start scan..."""
 
+# Construct a list of targets (IP:PORT) from CIDR ranges and target files.
+def getTargetList():
+    targets = []
+    ### CIDR Subnet Mode
+    if(args.r):
+        ips = [str(ip) for ip in ipaddress.IPv4Network(args.r)]
+        for ip in ips:
+            for port in ports:
+                targets.append(f"{ip}:{port}")
+        
 
+    ### File with CIDR Subnets
+    if(args.rf):
+        with open(args.rf) as file:
+            ranges = [line.rstrip() for line in file]        
+        for range in ranges:
+            ips = [str(ip) for ip in ipaddress.IPv4Network(range)]
+            for ip in ips:
+                for port in ports:
+                    targets.append(f"{ip}:{port}")
+        debug(f"{Style.BRIGHT}{Fore.MAGENTA}[*]{Style.RESET_ALL} Loaded {len(ranges)} subnets from {args.rf}.")
+
+
+    ### File with raw targets
+    if(args.tf):
+        with open(args.tf) as file:
+            ips = [line.rstrip() for line in file]
+        for ip in ips:
+            for port in ports:
+                targets.append(f"{ip}:{port}")
+
+    return targets
+
+
+# Print response data from a scan.
 def printResponse(response):
     html = bs4.BeautifulSoup(response.text)
     try:
         server = response.headers['Server']
     except:
         server = "???"
+
     print(f"    [ Status : {response.status_code}")
     print(f"    [ Server : {server}")
     print(f"    [ Title  : {html.title.text if html.title else "???"}")
 
-def scanCIDR(cidrRange):
-    # Generate all target connection strings (ports included)
-    ips = [str(ip) for ip in ipaddress.IPv4Network(cidrRange)]
-    targets = []
-    for ip in ips:
-        for port in ports:
-            targets.append(f"{ip}:{port}")
 
-    print(f"{Style.BRIGHT}{Fore.YELLOW}[~]{Style.RESET_ALL} Starting scan of subnet {cidrRange} - {len(targets)} targets (~{len(targets)*(args.s + args.t)} seconds)")
-    # Scan
-    scanned = []
-    alive = []
-    target = random.choice(targets)
-    for i in targets:
-        while target in scanned:
-            target = random.choice(targets)
-        
-        try:
-            # HTTP
-            response = requests.get(f"http://{target}", headers=headers, timeout=args.t, verify=False)
-            print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} {Style.RESET_ALL}http://{target}")
-            printResponse(response)
-            alive.append(target)
-
-        except requests.exceptions.SSLError:
-            # HTTPS
-            response = requests.get(f"https://{target}", headers=headers, timeout=args.t, verify=False)
-            print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} {Style.RESET_ALL}https://{target}")
-            printResponse(response)
-            alive.append(target)
-
-        except requests.exceptions.SSLError:
-            # HTTPS with additional SSL error
-            print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} {target} is up but has an SSL error.")
-            alive.append(target)
-
-        except requests.exceptions.ReadTimeout:
-            # Timeouts
-            print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} {target} timed out, but is likely up.")
-            alive.append(target)
-
-        except:
-            debug(f"{Style.DIM}[x] {target}{Style.RESET_ALL}")
-            pass
-        
-        # Sleep and jitter
-        sleep(args.s + random.randint(0,args.j))
-        scanned.append(target)
-    
-    return alive
-
+# Scan a single target (192.168.20.1:80).
+# Returns the target for alive and None for dead.
 def scanSingle(target):
     try:
-        # HTTP
-        response = requests.get(f"http://{target}", headers=headers, timeout=args.t, verify=False)
-        print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} {Style.RESET_ALL}http://{target}")
+        # Try HTTPS for 443s first
+        if target.split(":")[-1] == "443":
+            response = requests.get(f"https://{target}", headers=headers, timeout=args.t, verify=False)
+            print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} {Style.RESET_ALL}https://{target}")
+        else:
+            response = requests.get(f"http://{target}", headers=headers, timeout=args.t, verify=False)
+            print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} {Style.RESET_ALL}http://{target}")
         printResponse(response)
-        return target
-
-    except requests.exceptions.SSLError:
-        # HTTPS
-        response = requests.get(f"https://{target}", headers=headers, timeout=args.t, verify=False)
-        print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} {Style.RESET_ALL}https://{target}")
-        printResponse(response)
-        return target
 
     except requests.exceptions.SSLError:
         # HTTPS with additional SSL error
         print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} {target} is up but has an SSL error.")
-        return target
 
     except requests.exceptions.ReadTimeout:
         # Timeouts
         print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} {target} timed out, but is likely up.")
-        return target
-
+    
     except:
-        debug(f"{Style.DIM}[x] {target}{Style.RESET_ALL}")
+        debug(f"[x] {target}")
         return None
+    
+    # Check IIS servers for NTLM
+    finally:
+        try:
+            server = response.headers['Server']
+        except:
+            server = "???"
+        if args.ntlm and "IIS" in server:
+            debug(f"[?] Found IIS server - scanning for NTLM...")
+            scanNTLM(target)
         
-    return None
+    return target
 
+
+# Scan a given IIS server for NTLM authentication endpoints - ADCS and SCCM.
+def scanNTLM(target):
+    auth_header = ""
+    try:
+        response = requests.get(f"http://{target}/", headers=headers, timeout=args.t, verify=False)
+        auth_header = response.headers["WWW-Authenticate"]
+    except:
+        pass
+    try:
+        response = requests.get(f"https://{target}/", headers=headers, timeout=args.t, verify=False)
+        auth_header = response.headers["WWW-Authenticate"]
+    except:
+        pass
+    if "NTLM" in auth_header:
+        print(f"{Style.BRIGHT}{Fore.RED}    [!] UNKNOWN - NTLM AUTHENTICATION ENABLED ({target}){Style.RESET_ALL}")
+    
+    auth_header = ""
+    try:
+        response = requests.get(f"http://{target}/certsrv/", headers=headers, timeout=args.t, verify=False)
+        auth_header = response.headers["WWW-Authenticate"]
+    except:
+        pass
+    try:
+        response = requests.get(f"https://{target}/certsrv/", headers=headers, timeout=args.t, verify=False)
+        auth_header = response.headers["WWW-Authenticate"]
+    except:
+        pass
+    if "NTLM" in auth_header:
+        print(f"{Style.BRIGHT}{Fore.RED}    [!] ADCS - NTLM AUTHENTICATION ENABLED ({target}){Style.RESET_ALL}")
+
+    auth_header = ""
+    try:
+        response = requests.get(f"http://{target}/ccm_system_windowsauth/request", headers=headers, timeout=args.t, verify=False)
+        auth_header = response.headers["WWW-Authenticate"]
+    except:
+        pass
+    try:
+        response = requests.get(f"https://{target}/ccm_system_windowsauth/request", headers=headers, timeout=args.t, verify=False)
+        auth_header = response.headers["WWW-Authenticate"]
+    except:
+        pass
+    if "NTLM" in auth_header:
+        print(f"{Style.BRIGHT}{Fore.RED}    [!] SCCM - NTLM AUTHENTICATION ENABLED ({target}){Style.RESET_ALL}")
+
+
+# Print scan results and write to output file.
 def finishScan(alive):
     print(f"{Style.BRIGHT}{Fore.GREEN}[+]{Style.RESET_ALL} Discovered {len(alive)} alive targets! Writing to {args.o}...")
     with open(args.o, 'w') as f:
@@ -170,49 +210,49 @@ def finishScan(alive):
 # Debug messages
 def debug(msg):
     if args.debug:
-        print(msg)
-    else:
-        pass
-    
+        print(f"{Style.DIM}{msg}{Style.RESET_ALL}")
+
 
 def main():
     print(settings_blob)
     input()
 
-    ### CIDR Subnet Mode
-    if(args.r):
-        alive = scanCIDR(args.r)
-        finishScan(alive)
+    ### Generate target list from usage mode
+    targets = getTargetList()
+    debug(f"[?] Targets: {targets}")
+    print(f"{Style.BRIGHT}{Fore.MAGENTA}[*]{Style.RESET_ALL} Loaded {len(targets)} targets.")
+    
+    ### Scan targets
+    alive = []
+    scanned = []
 
-
-    ### File with CIDR Subnets
-    if(args.rf):
-        with open(args.rf) as file:
-            ranges = [line.rstrip() for line in file]        
-        print(f"{Style.BRIGHT}{Fore.MAGENTA}[*]{Style.RESET_ALL} Loaded {len(ranges)} subnets from {args.rf}.")
-        alive = []
-        for cidr in ranges:
-            alive += scanCIDR(cidr)
-        finishScan(alive)
-        
-
-    ### File with raw targets
-    if(args.tf):
-        with open(args.tf) as file:
-            ips = [line.rstrip() for line in file]
-        targets = []
-        for ip in ips:
-            for port in ports:
-                targets.append(f"{ip}:{port}")
-
-        print(f"{Style.BRIGHT}{Fore.MAGENTA}[*]{Style.RESET_ALL} Loaded {len(targets)} targets from {args.tf}.")
-        alive = []
+    # non-random scanning
+    if args.no_random:
         for target in targets:
+            # Returns true if the target is alive.
             if scanSingle(target):
                 alive += [target]
+            scanned += [target]
+
             # Sleep and jitter
             sleep(args.s + random.randint(0,args.j))
-        finishScan(alive)
+    
+    # random scanning
+    else:
+        target = random.choice(targets)
+        for i in targets:
+            while target in scanned:
+                target = random.choice(targets)
+
+            # Returns true if the target is alive.
+            if scanSingle(target):
+                alive += [target]
+            scanned += [target]
+
+            # Sleep and jitter
+            sleep(args.s + random.randint(0,args.j))
+
+    finishScan(alive)
 
     return
 

@@ -2,7 +2,7 @@
 
 # Who's Up?
 
-A basic script for when you want to take things slow in web host enumeration and avoid IDS. Provide CIDR ranges or a host list and kick back.
+Enumerate web servers and NTLM relay targets (ADCS/SCCM) while avoiding IDS - just specify a CIDR range and kick back.
 
 The script will report status codes, server headers, and HTML title tags if it can find them:
 ![example](./example.png)
@@ -19,8 +19,9 @@ options:
   -s [num]           Sleep in seconds. Default is 3s.
   -j [num]           Jitter in seconds. Default is 1s.
   -ua "Mozilla 1.x"  User-agent for requests. Default is Windows/Mozilla.
-  -o alive.txt       Output file for alive hosts. Defaults to web-hosts.txt.
-  --debug            Show all request results.
+  --ntlm             Search for commonly abused NTLM authentication endpoints.
+  -o web-hosts.txt   Output file for alive hosts. Defaults to web-hosts.txt.
+  --debug            Show debug information.
 
 targets:
   -r 10.10.10.0/24   Subnet range to scan (10.10.10.0/24)
